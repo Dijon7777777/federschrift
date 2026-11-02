@@ -1,0 +1,4 @@
+Federschrift nutzt:
+- hyphen (ISC-Lizenz, siehe vendor/hyphen-LICENSE.txt) für die Silbentrennung
+- das Dateiformat aus goodnotes-codec (MIT-Lizenz, Copyright Taylor Nilsen), https://github.com/Taylor-Nilsen/goodnotes-codec
+- Hershey-Schriftdaten für die Beispielschrift
