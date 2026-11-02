@@ -50,6 +50,8 @@ nav button[aria-selected="true"]{background:var(--royal);color:var(--on-royal)}
 .notice{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;background:var(--blotter);color:var(--on-blotter);border-radius:10px;padding:10px 14px}
 .notice span{flex:1 1 240px;min-width:0}
 .notice .btn{background:var(--surface);border-color:transparent;color:var(--fg)}
+.notice.info{background:var(--surface);color:var(--fg);border:2px solid var(--royal)}
+.notice.info .btn{background:var(--bg)}
 
 /* Alphabet */
 .desk{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:start}
@@ -114,6 +116,10 @@ select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10p
 
   <section id="view-write" class="work" aria-labelledby="tab-write">
     <div class="side">
+      <div class="notice info" id="installNote" hidden>
+        <span id="installText"></span>
+        <button class="btn" id="installClose">Verstanden</button>
+      </div>
       <div class="notice" id="sampleNote">
         <span>Das ist eine Beispielschrift. Schreib dein Alphabet, dann erscheint der Text in deiner Handschrift.</span>
         <button class="btn" id="goAlpha">Alphabet schreiben</button>
@@ -917,7 +923,18 @@ function wire(){
   let w=0;new ResizeObserver(()=>{const n=document.documentElement.clientWidth;if(n!==w){w=n;if(!$('view-alpha').hidden)sizePad();else scheduleLayout()}}).observe(document.documentElement);
 }
 
-buildTiles();wire();syncInputs();
+function installHint(){
+  const standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+  if(!window.FS_APP||standalone||store.get('fs.installSeen'))return;
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1;
+  $('installText').textContent=ios
+    ?'Als App installieren: In Safari auf Teilen tippen und „Zum Home-Bildschirm“ wählen. Danach läuft Federschrift auch ohne Internet.'
+    :'Als App installieren: Im Browsermenü „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen. Danach läuft Federschrift auch ohne Internet.';
+  $('installNote').hidden=false;
+  $('installClose').onclick=()=>{$('installNote').hidden=true;store.set('fs.installSeen',true)};
+}
+
+buildTiles();wire();syncInputs();installHint();
 $('text').value=store.get('fs.text')??SAMPLETEXT;
 loadCurrent();ORDER.forEach(renderTile);updateStage();render();
 const start=async()=>{await connect();if(!col)render()};
