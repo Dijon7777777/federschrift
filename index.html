@@ -52,6 +52,13 @@ nav button[aria-selected="true"]{background:var(--royal);color:var(--on-royal)}
 .notice .btn{background:var(--surface);border-color:transparent;color:var(--fg)}
 .notice.info{background:var(--surface);color:var(--fg);border:2px solid var(--royal)}
 .notice.info .btn{background:var(--bg)}
+.sentview{display:grid;gap:12px}
+#sentText{font:700 30px/1.2 var(--display);margin:2px 0 0;overflow-wrap:anywhere}
+#sentProgress,#sentInfo{color:var(--muted);font-size:14px}
+#spad{display:block;width:100%;aspect-ratio:7;background:var(--surface);border:1px solid var(--line);border-radius:10px;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.variants button.tool{padding:0 14px}
+#sentStatus{flex:1 1 260px;min-width:0;font-size:15px}
+#sentMsg{margin:0;min-height:22px;color:var(--royal);font-weight:700}
 
 /* Alphabet */
 .desk{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:start}
@@ -109,6 +116,7 @@ select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10p
     <h1>Federschrift</h1>
     <nav role="tablist" aria-label="Bereiche">
       <button id="tab-alpha" role="tab" aria-selected="false">Mein Alphabet</button>
+      <button id="tab-sent" role="tab" aria-selected="false">Sätze</button>
       <button id="tab-write" role="tab" aria-selected="true">Schreiben</button>
     </nav>
     <span id="sync">Wird geladen</span>
@@ -196,6 +204,35 @@ select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10p
         <input type="file" id="importFile" accept=".json,application/json" hidden>
         <button class="btn" id="wipe">Alles löschen</button>
       </div>
+    </div>
+  </section>
+
+  <section id="view-sent" class="sentview" aria-labelledby="tab-sent" hidden>
+    <div>
+      <small id="sentProgress"></small>
+      <h2 id="sentText"></h2>
+    </div>
+    <canvas id="spad" aria-label="Schreibfeld für Sätze"></canvas>
+    <div class="row" id="sentWrite">
+      <button class="btn" id="sUndo">Strich zurück</button>
+      <button class="btn" id="sClear">Löschen</button>
+      <button class="btn" id="sSkip">Überspringen</button>
+      <button class="btn main grow" id="sDone">Fertig, prüfen</button>
+    </div>
+    <div class="row" id="sentReview" hidden>
+      <div class="variants" role="group" aria-label="Werkzeug zum Korrigieren">
+        <button class="tool" id="toolSplit">Trennen</button>
+        <button class="tool" id="toolMerge">Verbinden</button>
+      </div>
+      <span id="sentStatus" role="status"></span>
+      <button class="btn" id="sentBack">Weiterschreiben</button>
+      <button class="btn main" id="sentAccept">Übernehmen</button>
+    </div>
+    <p id="sentMsg" role="status"></p>
+    <p style="margin:0;color:var(--muted);font-size:14px">Schreib den Satzteil so ab, wie du normal schreibst, auf die rote Grundlinie. Lass zwischen den Wörtern etwas Platz. Danach zeigt die App, welche Striche zu welchem Buchstaben gehören. Buchstaben aus Sätzen werden beim Schreiben bevorzugt, weil sie natürlicher aussehen. Zeichen, die in keinem Satz vorkommen, kommen weiter aus deinem Alphabet.</p>
+    <div class="row backup">
+      <span id="sentInfo"></span>
+      <button class="btn grow" id="sentWipe">Satz-Buchstaben löschen</button>
     </div>
   </section>
 </div>
@@ -433,8 +470,15 @@ const use=n=>window.claude&&window.claude.use?window.claude.use(n):Promise.resol
 let font=store.get('fs.font')||{};
 let opt={...DEF,...(store.get('fs.opt')||{})};
 const sampleFont=Object.fromEntries(Object.entries(SAMPLE).map(([c,g])=>[c,[g]]));
-const hasOwn=()=>Object.keys(font).length>0;
-const activeFont=()=>hasOwn()?font:sampleFont;
+let sent=store.get('fs.sent')||{};
+const hasOwn=()=>Object.keys(font).length>0||Object.keys(sent).length>0;
+/* Satz-Buchstaben zuerst; bei nur einer Satz-Version kommen die Alphabet-Versionen dazu */
+function activeFont(){
+  if(!hasOwn())return sampleFont;
+  const f={};
+  for(const k of new Set([...Object.keys(font),...Object.keys(sent)])){const s=sent[k]||[];f[k]=s.length>=2?s:[...s,...(font[k]||[])]}
+  return f;
+}
 
 /* ---------- Zufall ---------- */
 function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -633,6 +677,14 @@ function pushGlyph(c){
     catch(e){setSync('Nur auf diesem Gerät gespeichert')}
   });
 }
+function pushSent(c){
+  if(!col)return;
+  const v=sent[c], ref=col.doc('s'+c.codePointAt(0));
+  queue=queue.then(async()=>{
+    try{if(v&&v.length)await ref.set({ch:c,kind:'sent',v});else await ref.delete();setSync('In deinem Konto gespeichert')}
+    catch(e){setSync('Nur auf diesem Gerät gespeichert')}
+  });
+}
 function persist(c){const ok=saveLocal();pushGlyph(c);if(!col)setSync(ok?'Auf diesem Gerät gespeichert':'Speichern nicht möglich, bitte Schrift sichern')}
 async function connect(){
   const timeout=new Promise(r=>setTimeout(()=>r(null),10000));
@@ -645,9 +697,15 @@ async function connect(){
     if(!snap){setSync('Konto nicht erreichbar, speichert auf diesem Gerät');return}
     col=c;
     const seen=new Set();
-    snap.docs.forEach(d=>{const b=d.data();if(b&&b.ch&&Array.isArray(b.v)){font[b.ch]=b.v.map(g=>JSON.parse(JSON.stringify(g)));seen.add(b.ch)}});
+    const seenS=new Set();
+    snap.docs.forEach(d=>{
+      const b=d.data();if(!b||!b.ch||!Array.isArray(b.v))return;
+      const v=b.v.map(g=>JSON.parse(JSON.stringify(g)));
+      if(b.kind==='sent'){sent[b.ch]=v;seenS.add(b.ch)}else{font[b.ch]=v;seen.add(b.ch)}
+    });
     Object.keys(font).filter(k=>!seen.has(k)).forEach(pushGlyph);
-    saveLocal();setSync('In deinem Konto gespeichert');
+    Object.keys(sent).filter(k=>!seenS.has(k)).forEach(pushSent);
+    saveLocal();store.set('fs.sent',sent);setSync('In deinem Konto gespeichert');
     refreshAll();
   }catch(e){setSync('Speichert auf diesem Gerät')}
 }
@@ -708,8 +766,8 @@ function drawPad(){
   const sk=canvasSink(pc);
   for(const s of cur.strokes)emit(s.flat(),9,sk);
 }
-function point(e){
-  const r=pad.getBoundingClientRect(), k=VH/r.height;
+function point(e,el=pad){
+  const r=el.getBoundingClientRect(), k=VH/r.height;
   const p=e.pointerType==='pen'?clamp(e.pressure||.4,.05,1):.5;
   return[(e.clientX-r.left)*k,(e.clientY-r.top)*k-U.top,Math.round(p*100)];
 }
@@ -777,6 +835,202 @@ function renderTile(c){
   x.setTransform(k,0,0,k,60-g.w*k/2,74);
   x.strokeStyle=tok('--fg');x.lineCap='round';x.lineJoin='round';
   const sk=canvasSink(x);g.s.forEach(a=>emit(a,26,sk));
+}
+
+/* ---------- Sätze abschreiben ---------- */
+const SENTENCES=[
+  'Franz jagt im komplett verwahrlosten Taxi quer durch Bayern.',
+  'Zwölf Boxkämpfer jagen Viktor quer über den großen Sylter Deich.',
+  'Heute schreibe ich meine Hausaufgaben in Deutsch und Mathe.',
+  'Die Sonne scheint, aber es ist trotzdem ziemlich kalt draußen.',
+  'Wir treffen uns morgen um halb drei vor der Schule.',
+  'Im Herbst fallen die bunten Blätter von den Bäumen.',
+  'Quirin und Yvonne essen jeden Mittwoch Pizza mit Oliven.',
+  'Am Wochenende fahren wir mit dem Zug nach Köln.'
+];
+const SASPECT=7, SVW=VH*SASPECT, MAXS=6, FLAT=new Set([...'acemnorsuvwxzABCDEFHIKLMNORSTUVWXZ0123456789']);
+function chunksOf(s){const out=[];let c='';for(const w of s.split(' ')){if(c&&(c+' '+w).length>18){out.push(c);c=w}else c=c?c+' '+w:w}if(c)out.push(c);return out}
+const CHUNKS=SENTENCES.flatMap((s,i)=>chunksOf(s).map((text,k,a)=>({s:i,k,n:a.length,text})));
+const spad=$('spad'), sc=spad.getContext('2d');
+let spos=clamp(Number(store.get('fs.spos'))||0,0,CHUNKS.length-1), sStrokes=[], sActive=null, review=null, sTool='split';
+const chunkChars=()=>[...CHUNKS[spos].text.replace(/ /g,'')];
+
+function box(strokes){let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const s of strokes)for(const p of s){x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1])}return{x0,x1,y0,y1}}
+const group=strokes=>({s:strokes,b:box(strokes)});
+const join=(a,b)=>group([...a.s,...b.s]);
+function splitAt(c,x){
+  const L=[],R=[];
+  for(const s of c.s){let run=[],left=null;for(const p of s){const l=p[0]<x;if(left!==null&&l!==left){(left?L:R).push(run);run=[]}left=l;run.push(p)}if(run.length)(left?L:R).push(run)}
+  return L.length&&R.length?[group(L),group(R)]:null;
+}
+/* Trennstelle: die Spalte mit der wenigsten Tinte in der Mitte des Teils */
+function cutPoint(c){
+  const w=c.b.x1-c.b.x0, a=c.b.x0+w*.25, bins=new Array(Math.max(1,Math.ceil(w*.5/20))).fill(0);
+  for(const s of c.s)for(const p of s){const i=Math.floor((p[0]-a)/20);if(i>=0&&i<bins.length)bins[i]++}
+  const mid=(bins.length-1)/2;let best=0;
+  bins.forEach((v,i)=>{if(v<bins[best]||v===bins[best]&&Math.abs(i-mid)<Math.abs(best-mid))best=i});
+  return a+best*20+10;
+}
+/* Striche zu Buchstaben bündeln: Überlappung verbindet, kleine Punkte oben gehören zum nächsten Buchstaben */
+function autoCluster(strokes,n){
+  const items=strokes.filter(s=>s.length).map(s=>group([s]));
+  const tiny=g=>g.b.x1-g.b.x0<110&&g.b.y1-g.b.y0<110&&(g.b.y0+g.b.y1)/2<-380;
+  const cl=items.filter(g=>!tiny(g)).sort((a,b)=>a.b.x0-b.b.x0);
+  for(let changed=true;changed;){
+    changed=false;
+    outer:for(let i=0;i<cl.length;i++)for(let j=i+1;j<cl.length;j++){
+      const a=cl[i].b,b=cl[j].b,ov=Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0),mw=Math.min(a.x1-a.x0,b.x1-b.x0);
+      if(ov>Math.max(25,.45*mw)){cl[i]=join(cl[i],cl[j]);cl.splice(j,1);changed=true;break outer}
+    }
+  }
+  for(const t of items.filter(tiny)){
+    if(!cl.length){cl.push(t);continue}
+    const cx=(t.b.x0+t.b.x1)/2;let bi=0,bd=1e9;
+    cl.forEach((c,i)=>{const d=cx<c.b.x0?c.b.x0-cx:cx>c.b.x1?cx-c.b.x1:0;if(d<bd){bd=d;bi=i}});
+    cl[bi]=join(cl[bi],t);
+  }
+  cl.sort((a,b)=>a.b.x0-b.b.x0);
+  while(cl.length>n&&cl.length>1){
+    let bi=0,bg=1e9;
+    for(let i=0;i<cl.length-1;i++){const g=cl[i+1].b.x0-cl[i].b.x1;if(g<bg){bg=g;bi=i}}
+    cl.splice(bi,2,join(cl[bi],cl[bi+1]));
+  }
+  for(let guard=0;cl.length<n&&guard<100;guard++){
+    let wi=0;cl.forEach((c,i)=>{if(c.b.x1-c.b.x0>cl[wi].b.x1-cl[wi].b.x0)wi=i});
+    const c=cl[wi];if(c.b.x1-c.b.x0<160)break;
+    const parts=splitAt(c,cutPoint(c));if(!parts)break;
+    cl.splice(wi,1,...parts);
+  }
+  return cl;
+}
+function sizeS(){
+  const r=spad.getBoundingClientRect();if(!r.width)return;
+  const d=Math.min(window.devicePixelRatio||1,3);
+  spad.width=Math.round(r.width*d);spad.height=Math.round(r.width/SASPECT*d);
+  drawS();
+}
+function drawS(){
+  const k=spad.height/VH;
+  sc.setTransform(1,0,0,1,0,0);sc.clearRect(0,0,spad.width,spad.height);
+  sc.setTransform(k,0,0,k,0,U.top*k);
+  const rule=(y,c,w,dash)=>{sc.strokeStyle=c;sc.lineWidth=w/k;sc.setLineDash(dash?[14,14]:[]);sc.beginPath();sc.moveTo(0,y);sc.lineTo(SVW,y);sc.stroke()};
+  rule(-U.cap,tok('--guide'),1,true);rule(-U.xh,tok('--guide'),1.4,false);rule(0,tok('--guide-strong'),2,false);rule(420,tok('--guide'),1,true);
+  sc.setLineDash([]);sc.lineCap='round';sc.lineJoin='round';
+  const sk=canvasSink(sc);
+  if(!review){sc.strokeStyle=tok('--fg');for(const s of sStrokes)emit(s.flat(),9,sk);return}
+  const chars=review.chars;
+  sc.font=`700 300px ${tok('--body')}`;sc.textAlign='center';
+  review.cl.forEach((c,i)=>{
+    const col=i>=chars.length?tok('--guide-strong'):i%2?tok('--royal'):tok('--fg');
+    sc.globalAlpha=.3;sc.fillStyle=tok('--line');sc.fillRect(c.b.x0-15,-U.top+60,c.b.x1-c.b.x0+30,VH-120);sc.globalAlpha=1;
+    sc.strokeStyle=col;for(const s of c.s)emit(s.flat(),9,sk);
+    sc.fillStyle=col;sc.fillText(i<chars.length?chars[i]:'?',(c.b.x0+c.b.x1)/2,560);
+  });
+}
+spad.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='pen')penSeen=true;
+  if(e.pointerType==='touch'&&penSeen&&!review)return;
+  if(e.button>0)return;
+  e.preventDefault();
+  if(review){reviewTap(point(e,spad)[0]);return}
+  try{spad.setPointerCapture(e.pointerId)}catch{}
+  sActive={id:e.pointerId,s:[point(e,spad)]};sStrokes.push(sActive.s);drawS();
+});
+spad.addEventListener('pointermove',e=>{
+  if(!sActive||e.pointerId!==sActive.id)return;
+  e.preventDefault();
+  const ev=e.getCoalescedEvents?e.getCoalescedEvents():[];
+  (ev.length?ev:[e]).forEach(x=>sActive.s.push(point(x,spad)));
+  drawS();
+});
+const sEnd=e=>{if(sActive&&e.pointerId===sActive.id){sActive=null;drawS()}};
+spad.addEventListener('pointerup',sEnd);spad.addEventListener('pointercancel',sEnd);
+['touchstart','touchmove'].forEach(t=>spad.addEventListener(t,e=>e.preventDefault(),{passive:false}));
+
+function reviewTap(x){
+  const cl=review.cl;
+  if(sTool==='split'){
+    const i=cl.findIndex(c=>x>=c.b.x0&&x<=c.b.x1);if(i<0)return;
+    const p=splitAt(cl[i],x);if(p)cl.splice(i,1,...p);
+  }else if(cl.length>1){
+    let bi=0,bd=1e9;
+    for(let i=0;i<cl.length-1;i++){const d=Math.abs(x-(cl[i].b.x1+cl[i+1].b.x0)/2);if(d<bd){bd=d;bi=i}}
+    cl.splice(bi,2,join(cl[bi],cl[bi+1]));
+  }
+  updateReview();
+}
+function setReview(on){$('sentWrite').hidden=on;$('sentReview').hidden=!on}
+function updateReview(){
+  const n=review.chars.length, m=review.cl.length, d=Math.abs(n-m);
+  $('sentStatus').textContent=m===n?`Passt: ${n} Zeichen erkannt. Prüf kurz die Buchstaben unter den Strichen.`
+    :m>n?`${d} ${d===1?'Teil':'Teile'} zu viel. Wähle „Verbinden“ und tippe zwischen zwei Teile, die zusammengehören.`
+    :`${d} ${d===1?'Zeichen fehlt':'Zeichen fehlen'}. Wähle „Trennen“ und tippe auf die Stelle, an der getrennt werden soll.`;
+  $('sentAccept').disabled=m!==n;
+  $('toolSplit').setAttribute('aria-pressed',String(sTool==='split'));$('toolMerge').setAttribute('aria-pressed',String(sTool==='merge'));
+  drawS();
+}
+function loadChunk(){
+  const c=CHUNKS[spos];
+  $('sentText').textContent=c.text;
+  $('sentProgress').textContent=`Satz ${c.s+1} von ${SENTENCES.length} · Teil ${c.k+1} von ${c.n}`;
+  sStrokes=[];review=null;setReview(false);drawS();
+}
+function acceptChunk(){
+  const chars=review.chars, cl=review.cl;
+  // Grundlinie und Schräglage aus Buchstaben ohne Unterlänge schätzen
+  const pts=[];cl.forEach((c,i)=>{if(FLAT.has(chars[i]))pts.push([(c.b.x0+c.b.x1)/2,c.b.y1])});
+  let a=0,b=0;
+  if(pts.length>=3){
+    const mx=pts.reduce((s,p)=>s+p[0],0)/pts.length, my=pts.reduce((s,p)=>s+p[1],0)/pts.length;
+    let sxy=0,sxx=0;for(const[x,y]of pts){sxy+=(x-mx)*(y-my);sxx+=(x-mx)**2}
+    if(Math.abs(my)<350){b=sxx?clamp(sxy/sxx,-.12,.12):0;a=my-b*mx}
+  }
+  const wordOf=[];CHUNKS[spos].text.split(' ').forEach((w,k)=>[...w].forEach(()=>wordOf.push(k)));
+  const touched=new Set(), gaps=[];
+  cl.forEach((c,i)=>{
+    const x0=c.b.x0, s=c.s.map(st=>simplify(st,3));
+    const g={w:Math.max(30,Math.round(c.b.x1-c.b.x0)),s:s.map(st=>st.flatMap(p=>[Math.round(p[0]-x0),Math.round(p[1]-a-b*p[0]),Math.round(p[2])]))};
+    const ch=chars[i];sent[ch]=[...(sent[ch]||[]),g].slice(-MAXS);touched.add(ch);
+    if(i<cl.length-1&&wordOf[i]===wordOf[i+1])gaps.push(cl[i+1].b.x0-c.b.x1);
+  });
+  store.set('fs.sent',sent);touched.forEach(pushSent);
+  let msg='Übernommen. Weiter mit dem nächsten Teil.';
+  if(gaps.length>=4){
+    gaps.sort((p,q)=>p-q);
+    const t=clamp(Math.round(gaps[gaps.length>>1]/5)*5,-40,200);
+    if(t!==opt.track){opt.track=t;syncInputs();store.set('fs.opt',opt);msg+=' Den Buchstabenabstand habe ich an deine Schrift angepasst.'}
+  }
+  spos=(spos+1)%CHUNKS.length;store.set('fs.spos',spos);
+  if(spos===0)msg='Alle Sätze geschafft. Schreib sie gern noch einmal, dann wird deine Schrift noch abwechslungsreicher.';
+  loadChunk();updateSentInfo();scheduleLayout();$('sentMsg').textContent=msg;
+}
+function updateSentInfo(){
+  const keys=Object.keys(sent), n=keys.reduce((s,k)=>s+sent[k].length,0);
+  $('sentInfo').textContent=n?`Aus Sätzen gelernt: ${n} Buchstaben, ${keys.length} verschiedene Zeichen.`:'Noch keine Buchstaben aus Sätzen gelernt.';
+  $('sentWipe').disabled=!n;
+}
+function wireSent(){
+  $('tab-sent').onclick=()=>show('sent');
+  $('sUndo').onclick=()=>{sStrokes.pop();drawS()};
+  $('sClear').onclick=()=>{sStrokes=[];drawS()};
+  $('sSkip').onclick=()=>{spos=(spos+1)%CHUNKS.length;store.set('fs.spos',spos);loadChunk();$('sentMsg').textContent=''};
+  $('sDone').onclick=()=>{
+    if(!sStrokes.length){$('sentMsg').textContent='Schreib zuerst den Satzteil ab.';return}
+    const chars=chunkChars();review={chars,cl:autoCluster(sStrokes,chars.length)};
+    setReview(true);$('sentMsg').textContent='';updateReview();
+  };
+  $('toolSplit').onclick=()=>{sTool='split';updateReview()};
+  $('toolMerge').onclick=()=>{sTool='merge';updateReview()};
+  $('sentBack').onclick=()=>{review=null;setReview(false);drawS()};
+  $('sentAccept').onclick=acceptChunk;
+  let armed=null;
+  $('sentWipe').onclick=()=>{
+    const b=$('sentWipe');
+    if(!armed){b.textContent='Wirklich löschen?';b.classList.add('warn');armed=setTimeout(()=>{armed=null;b.textContent='Satz-Buchstaben löschen';b.classList.remove('warn')},4000);return}
+    clearTimeout(armed);armed=null;b.textContent='Satz-Buchstaben löschen';b.classList.remove('warn');
+    const keys=Object.keys(sent);sent={};store.set('fs.sent',sent);keys.forEach(pushSent);updateSentInfo();scheduleLayout();
+  };
+  loadChunk();updateSentInfo();
 }
 
 /* ---------- Vorschau ---------- */
@@ -865,11 +1119,9 @@ async function exportFile(button,make,name){
 
 /* ---------- Bedienung ---------- */
 function show(which){
-  const alpha=which==='alpha';
-  if(!alpha)commit();
-  $('view-alpha').hidden=!alpha;$('view-write').hidden=alpha;
-  $('tab-alpha').setAttribute('aria-selected',String(alpha));$('tab-write').setAttribute('aria-selected',String(!alpha));
-  if(alpha)requestAnimationFrame(sizePad);else render();
+  if(which!=='alpha')commit();
+  ['alpha','sent','write'].forEach(v=>{$('view-'+v).hidden=v!==which;$('tab-'+v).setAttribute('aria-selected',String(v===which))});
+  if(which==='alpha')requestAnimationFrame(sizePad);else if(which==='sent')requestAnimationFrame(sizeS);else render();
 }
 function saveOpt(){store.set('fs.opt',opt);scheduleLayout()}
 function syncInputs(){
@@ -878,7 +1130,7 @@ function syncInputs(){
   $('hyph').checked=opt.hyph;
   INKS.forEach((_,i)=>$('ink'+i).setAttribute('aria-pressed',String(i===opt.ink)));
 }
-function refreshAll(){ORDER.forEach(renderTile);loadCurrent();updateStage();if(!$('view-alpha').hidden)drawPad();render()}
+function refreshAll(){ORDER.forEach(renderTile);loadCurrent();updateStage();if(!$('view-alpha').hidden)drawPad();updateSentInfo();render()}
 function wire(){
   $('tab-alpha').onclick=()=>show('alpha');$('tab-write').onclick=()=>show('write');$('goAlpha').onclick=()=>show('alpha');
   ['paper','margin'].forEach(k=>$(k).onchange=()=>{opt[k]=$(k).value;syncInputs();saveOpt()});
@@ -906,11 +1158,11 @@ function wire(){
   $('undo').onclick=()=>{clearTimeout(idle);if(cur.strokes.length){cur.strokes.pop();cur.dirty=true;drawPad()}};
   $('clear').onclick=()=>{clearTimeout(idle);cur.strokes=[];cur.dirty=true;commit();loadCurrent();drawPad()};
   for(let i=0;i<MAXV;i++)$('v'+i).onclick=()=>jump(cur.i,i);
-  $('exportFont').onclick=async()=>{commit();try{await saveFile('federschrift-handschrift.json',new Blob([JSON.stringify({federschrift:1,font})],{type:'application/json'}));setSync('Sicherung gespeichert')}catch(e){setSync('Sicherung abgebrochen')}};
+  $('exportFont').onclick=async()=>{commit();try{await saveFile('federschrift-handschrift.json',new Blob([JSON.stringify({federschrift:2,font,sent})],{type:'application/json'}));setSync('Sicherung gespeichert')}catch(e){setSync('Sicherung abgebrochen')}};
   $('importBtn').onclick=()=>$('importFile').click();
   $('importFile').onchange=async e=>{
     const f=e.target.files[0];if(!f)return;
-    try{const d=JSON.parse(await f.text());if(!d.font)throw 0;font=d.font;saveLocal();Object.keys(font).forEach(pushGlyph);refreshAll();setSync('Schrift geladen')}catch{setSync('Diese Datei ist keine Federschrift-Sicherung')}
+    try{const d=JSON.parse(await f.text());if(!d.font)throw 0;const oldS=Object.keys(sent);font=d.font;sent=d.sent||{};saveLocal();store.set('fs.sent',sent);Object.keys(font).forEach(pushGlyph);new Set([...oldS,...Object.keys(sent)]).forEach(pushSent);refreshAll();setSync('Schrift geladen')}catch{setSync('Diese Datei ist keine Federschrift-Sicherung')}
     e.target.value='';
   };
   let armed=null;
@@ -918,9 +1170,9 @@ function wire(){
     const b=$('wipe');
     if(!armed){b.textContent='Wirklich alles löschen?';b.classList.add('warn');armed=setTimeout(()=>{armed=null;b.textContent='Alles löschen';b.classList.remove('warn')},4000);return}
     clearTimeout(armed);armed=null;b.textContent='Alles löschen';b.classList.remove('warn');
-    const keys=Object.keys(font);font={};cur.strokes=[];cur.dirty=false;store.del('fs.font');keys.forEach(pushGlyph);refreshAll();
+    const keys=Object.keys(font),skeys=Object.keys(sent);font={};sent={};cur.strokes=[];cur.dirty=false;store.del('fs.font');store.set('fs.sent',sent);keys.forEach(pushGlyph);skeys.forEach(pushSent);refreshAll();
   };
-  let w=0;new ResizeObserver(()=>{const n=document.documentElement.clientWidth;if(n!==w){w=n;if(!$('view-alpha').hidden)sizePad();else scheduleLayout()}}).observe(document.documentElement);
+  let w=0;new ResizeObserver(()=>{const n=document.documentElement.clientWidth;if(n!==w){w=n;if(!$('view-alpha').hidden)sizePad();else if(!$('view-sent').hidden)sizeS();else scheduleLayout()}}).observe(document.documentElement);
 }
 
 function installHint(){
@@ -934,7 +1186,7 @@ function installHint(){
   $('installClose').onclick=()=>{$('installNote').hidden=true;store.set('fs.installSeen',true)};
 }
 
-buildTiles();wire();syncInputs();installHint();
+buildTiles();wire();wireSent();syncInputs();installHint();
 $('text').value=store.get('fs.text')??SAMPLETEXT;
 loadCurrent();ORDER.forEach(renderTile);updateStage();render();
 const start=async()=>{await connect();if(!col)render()};
