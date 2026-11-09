@@ -100,6 +100,20 @@ select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10p
 #missing{font-size:15px}
 .howto{margin:0;padding-left:20px;color:var(--muted);font-size:14px;display:grid;gap:2px}
 #msg{font-size:14px;color:var(--muted);min-height:20px}
+/* Sätze */
+.sent{display:grid;gap:12px;min-width:0}
+.sentence{margin:0;font:600 22px/1.5 var(--body);display:flex;flex-wrap:wrap;gap:2px 8px}
+.sentence button{border:0;background:none;padding:2px 6px;border-radius:8px;color:var(--muted);font:inherit}
+.sentence button.done{color:var(--fg)}
+.sentence button.done::after{content:" ✓";color:var(--royal);font-size:.7em}
+.sentence button[aria-current="true"]{background:var(--royal);color:var(--on-royal)}
+.sentence button[aria-current="true"]::after{color:var(--on-royal)}
+.sentence span{color:var(--muted);padding:2px 0}
+#spad{display:block;width:100%;aspect-ratio:4;background:var(--surface);border:1px solid var(--line);border-radius:10px 10px 0 0;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#ruler{display:block;width:100%;height:48px;margin-top:-12px;background:var(--surface);border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;touch-action:none;-webkit-user-select:none;user-select:none;cursor:ew-resize}
+.sent .hint{margin:0;color:var(--muted);font-size:14px}
+#sStats{color:var(--muted);font-size:14px}
+@media (max-width:700px){#spad{aspect-ratio:2.6}.sentence{font-size:18px}}
 @media (max-width:960px){.desk,.work{grid-template-columns:minmax(0,1fr)}.stage{position:static}}
 @media (prefers-reduced-motion:no-preference){nav button,.btn{transition:background .12s}}
 </style>
@@ -109,6 +123,7 @@ select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10p
     <h1>Federschrift</h1>
     <nav role="tablist" aria-label="Bereiche">
       <button id="tab-alpha" role="tab" aria-selected="false">Mein Alphabet</button>
+      <button id="tab-sent" role="tab" aria-selected="false">Sätze</button>
       <button id="tab-write" role="tab" aria-selected="true">Schreiben</button>
     </nav>
     <span id="sync">Wird geladen</span>
@@ -121,7 +136,7 @@ select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10p
         <button class="btn" id="installClose">Verstanden</button>
       </div>
       <div class="notice" id="sampleNote">
-        <span>Das ist eine Beispielschrift. Schreib dein Alphabet, dann erscheint der Text in deiner Handschrift.</span>
+        <span>Das ist eine Beispielschrift. Schreib dein Alphabet und ein paar Sätze, dann erscheint der Text in deiner Handschrift.</span>
         <button class="btn" id="goAlpha">Alphabet schreiben</button>
       </div>
       <div>
@@ -170,6 +185,26 @@ select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10p
     </div>
   </section>
 
+  <section id="view-sent" class="sent" aria-labelledby="tab-sent" hidden>
+    <div class="stagehead">
+      <div><h2>Schreib das markierte Wort</h2><small id="sProgress"></small></div>
+      <label for="sSource" style="flex:0 1 240px"><select id="sSource"><option value="demo">Übungssätze</option><option value="text">Sätze aus meinem Text</option></select></label>
+    </div>
+    <p class="sentence" id="sentence" aria-live="polite"></p>
+    <canvas id="spad" aria-label="Schreibfeld für Wörter"></canvas>
+    <canvas id="ruler" aria-label="Trennstriche zwischen den Buchstaben verschieben"></canvas>
+    <div class="row">
+      <button class="btn" id="sPrev">Zurück</button>
+      <button class="btn" id="sUndo">Strich zurück</button>
+      <button class="btn" id="sClear">Löschen</button>
+      <label class="check" for="sAuto"><input type="checkbox" id="sAuto" checked> Automatisch weiter</label>
+      <button class="btn" id="sSkip">Nächster Satz</button>
+      <button class="btn main grow" id="sNext">Weiter</button>
+    </div>
+    <p class="hint">Schreib das Wort so, wie du es normal schreibst, auf der roten Grundlinie. Die App teilt es selbst in Buchstaben auf. Liegt ein Trennstrich falsch, zieh ihn in der Leiste unter dem Feld an die richtige Stelle. Die Buchstaben aus deinen Wörtern werden beim Schreiben mitbenutzt. Kommen mehrere Buchstaben hintereinander so in einem deiner Wörter vor, nimmt die App das ganze Stück mit den echten Verbindungen.</p>
+    <span id="sStats"></span>
+  </section>
+
   <section id="view-alpha" class="desk" aria-labelledby="tab-alpha" hidden>
     <div class="stage">
       <div class="stagehead">
@@ -187,7 +222,7 @@ select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10p
         <label class="check" for="auto"><input type="checkbox" id="auto" checked> Automatisch weiter</label>
         <button class="btn main grow" id="next">Weiter</button>
       </div>
-      <p style="margin:0;color:var(--muted);font-size:14px">Kleine Buchstaben stehen zwischen den blauen Linien, die Grundlinie ist rot. Sobald du den Stift hebst, wartet die App kurz und springt dann zum nächsten Zeichen. Zweite und dritte Versionen häufiger Buchstaben wie e, n, r und s lassen die Schrift echter aussehen.</p>
+      <p style="margin:0;color:var(--muted);font-size:14px">Kleine Buchstaben stehen zwischen den blauen Linien, die Grundlinie ist rot. Sobald du den Stift hebst, wartet die App kurz und springt dann zum nächsten Zeichen. Zweite und dritte Versionen häufiger Buchstaben wie e, n, r und s lassen die Schrift echter aussehen. Noch echter wird es, wenn du unter „Sätze“ ganze Wörter schreibst.</p>
     </div>
     <div class="sheet" id="sheet">
       <div class="row backup" id="backup">
@@ -432,9 +467,70 @@ const use=n=>window.claude&&window.claude.use?window.claude.use(n):Promise.resol
 
 let font=store.get('fs.font')||{};
 let opt={...DEF,...(store.get('fs.opt')||{})};
+let words=Array.isArray(store.get('fs.words'))?store.get('fs.words'):[];
 const sampleFont=Object.fromEntries(Object.entries(SAMPLE).map(([c,g])=>[c,[g]]));
-const hasOwn=()=>Object.keys(font).length>0;
-const activeFont=()=>hasOwn()?font:sampleFont;
+const hasOwn=()=>Object.keys(font).length>0||words.length>0;
+
+/* ---------- Wörter: in Buchstaben zerlegen und Stücke wiederverwenden ----------
+   Ein Wort-Eintrag: {id, w:'Wald', s:[[x,y,druck,…],…], c:[x0,schnitt1,…,x1]} in Schreibfeld-Einheiten. */
+let derived={}, pairIdx=new Map(), glyphCache=new Map();
+const toPts=a=>{const o=[];for(let i=0;i<a.length;i+=3)o.push([a[i],a[i+1],a[i+2]]);return o};
+function clipStrokes(strokes,a,b){
+  const out=[];
+  for(const st of strokes){
+    if(st.length===1){if(st[0][0]>=a&&st[0][0]<b)out.push([st[0]]);continue}
+    let run=null;
+    for(let i=0;i<st.length-1;i++){
+      const p=st[i],q=st[i+1],d=q[0]-p[0],ts=[0,1];
+      if(d)for(const e of[a,b]){const t=(e-p[0])/d;if(t>0&&t<1)ts.push(t)}
+      ts.sort((m,n)=>m-n);
+      const L=t=>[p[0]+d*t,p[1]+(q[1]-p[1])*t,p[2]+(q[2]-p[2])*t];
+      for(let j=0;j<ts.length-1;j++){
+        const t0=ts[j],t1=ts[j+1];if(t1-t0<1e-9)continue;
+        const mx=p[0]+d*(t0+t1)/2;
+        if(mx>=a&&mx<b){if(!run){run=[L(t0)];out.push(run)}run.push(L(t1))}else run=null;
+      }
+    }
+  }
+  return out;
+}
+function glyphOf(e,i,j){
+  const key=e.id+':'+i+':'+j;
+  if(glyphCache.has(key))return glyphCache.get(key);
+  const pts=e.s.map(toPts), a=e.c[i], b=e.c[j]+(j===e.c.length-1?.01:0);
+  const s=clipStrokes(pts,a,b).map(r=>r.flatMap(p=>[Math.round(p[0]-a),Math.round(p[1]),Math.round(p[2])]));
+  const g={w:Math.max(30,Math.round(b-a)),s};
+  glyphCache.set(key,g);return g;
+}
+function rebuildDerived(){
+  derived={};pairIdx=new Map();glyphCache=new Map();
+  for(const e of words){
+    const cs=[...e.w];
+    if(!Array.isArray(e.c)||e.c.length!==cs.length+1)continue;
+    cs.forEach((ch,k)=>{const g=glyphOf(e,k,k+1);if(g.s.length)(derived[ch]=derived[ch]||[]).push(g)});
+    for(let k=0;k<cs.length-1;k++){const key=cs[k]+cs[k+1];if(!pairIdx.has(key))pairIdx.set(key,[]);pairIdx.get(key).push({e,cs,k})}
+  }
+}
+/* Längstes Stück ab Position i, das genau so in einem geschriebenen Wort vorkommt (mindestens 2 Buchstaben). */
+function findRun(cs,i,rng){
+  if(i+1>=cs.length)return null;
+  const list=pairIdx.get(cs[i]+cs[i+1]);if(!list)return null;
+  let best=[],bk=0;
+  for(const h of list){
+    let m=2;while(h.k+m<h.cs.length&&i+m<cs.length&&h.cs[h.k+m]===cs[i+m])m++;
+    if(m>bk){bk=m;best=[h]}else if(m===bk)best.push(h);
+  }
+  const h=best[Math.floor(rng()*best.length)];
+  const g=glyphOf(h.e,h.k,h.k+bk);
+  return g.s.length?{k:bk,g}:null;
+}
+function activeFont(){
+  if(!hasOwn())return sampleFont;
+  const f={};
+  for(const k of new Set([...Object.keys(font),...Object.keys(derived)]))f[k]=[...(font[k]||[]),...(derived[k]||[])];
+  return f;
+}
+rebuildDerived();
 
 /* ---------- Zufall ---------- */
 function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -498,14 +594,17 @@ function geometry(o){
   const lh=(o.paper==='grid'?Math.max(1,Math.round(o.line/5))*5:o.line)*MM;
   return{m,lh,rows:Math.max(1,Math.floor((PH-m.t-m.b)/lh)+1)};
 }
-function layout(text,f,o){
+function layout(text,f,o,ph){
   const rng=mulberry(o.seed*7919+13), gs=()=>(rng()+rng()+rng()-1.5)/.75, n=o.nat/100, miss=new Set();
   const S=o.xh*MM/U.xh, G=geometry(o), maxX=PW-G.m.r;
   const pages=[[]]; let row=0,x=0,slope=0,wob=0,lineEmpty=true,last=null;
   const startLine=()=>{x=G.m.l+rng()*2.2*MM*n;slope=(rng()-.5)*.009*n;wob=rng()*6.28;lineEmpty=true};
   const newline=()=>{if(++row>=G.rows){row=0;pages.push([])}startLine()};
   const baseY=xx=>G.m.t+row*G.lh+slope*(xx-G.m.l)+Math.sin(xx/70+wob)*.45*n-.6;
-  const build=w=>{const seq=[];for(const c of w){const r=resolve(c,f,rng,last,miss);if(!r){seq.push({w:U.xh*.7,s:[],gap:0});continue}for(const g of r){seq.push({w:g.w,s:g.s,gap:o.track+gs()*16*n});last=g}}return seq};
+  const build=w=>{const seq=[],cs=[...w];for(let i=0;i<cs.length;){
+    const run=ph&&ph(cs,i,rng);
+    if(run){seq.push({w:run.g.w,s:run.g.s,gap:o.track+gs()*16*n});last=null;i+=run.k;continue}
+    const c=cs[i++],r=resolve(c,f,rng,last,miss);if(!r){seq.push({w:U.xh*.7,s:[],gap:0});continue}for(const g of r){seq.push({w:g.w,s:g.s,gap:o.track+gs()*16*n});last=g}}return seq};
   const width=seq=>seq.reduce((a,g)=>a+(g.w+g.gap)*S,0);
   function stamp(g,dyW){
     const rot=gs()*.022*n,c=Math.cos(rot),s=Math.sin(rot),sc=1+gs()*.04*n,sh=gs()*.035*n,dx=gs()*9*n,dy=gs()*15*n+dyW;
@@ -633,6 +732,16 @@ function pushGlyph(c){
     catch(e){setSync('Nur auf diesem Gerät gespeichert')}
   });
 }
+function saveWordsLocal(){return store.set('fs.words',words)}
+function pushWord(id){
+  if(!col)return;
+  const e=words.find(x=>x.id===id);
+  queue=queue.then(async()=>{
+    try{if(e)await col.doc('w'+id).set({word:e});else await col.doc('w'+id).delete();setSync('In deinem Konto gespeichert')}
+    catch(err){setSync('Nur auf diesem Gerät gespeichert')}
+  });
+}
+function persistWord(id){const ok=saveWordsLocal();pushWord(id);if(!col)setSync(ok?'Auf diesem Gerät gespeichert':'Speichern nicht möglich, bitte Schrift sichern')}
 function persist(c){const ok=saveLocal();pushGlyph(c);if(!col)setSync(ok?'Auf diesem Gerät gespeichert':'Speichern nicht möglich, bitte Schrift sichern')}
 async function connect(){
   const timeout=new Promise(r=>setTimeout(()=>r(null),10000));
@@ -644,10 +753,15 @@ async function connect(){
     const snap=await Promise.race([c.limit(1000).get(),timeout]);
     if(!snap){setSync('Konto nicht erreichbar, speichert auf diesem Gerät');return}
     col=c;
-    const seen=new Set();
-    snap.docs.forEach(d=>{const b=d.data();if(b&&b.ch&&Array.isArray(b.v)){font[b.ch]=b.v.map(g=>JSON.parse(JSON.stringify(g)));seen.add(b.ch)}});
+    const seen=new Set(), seenW=new Set();
+    snap.docs.forEach(d=>{
+      const b=d.data();
+      if(b&&b.ch&&Array.isArray(b.v)){font[b.ch]=b.v.map(g=>JSON.parse(JSON.stringify(g)));seen.add(b.ch)}
+      if(b&&b.word&&b.word.id){const e=JSON.parse(JSON.stringify(b.word)),i=words.findIndex(x=>x.id===e.id);if(i>=0)words[i]=e;else words.push(e);seenW.add(e.id)}
+    });
     Object.keys(font).filter(k=>!seen.has(k)).forEach(pushGlyph);
-    saveLocal();setSync('In deinem Konto gespeichert');
+    words.filter(e=>!seenW.has(e.id)).forEach(e=>pushWord(e.id));
+    saveLocal();saveWordsLocal();rebuildDerived();setSync('In deinem Konto gespeichert');
     refreshAll();
   }catch(e){setSync('Speichert auf diesem Gerät')}
 }
@@ -779,6 +893,202 @@ function renderTile(c){
   const sk=canvasSink(x);g.s.forEach(a=>emit(a,26,sk));
 }
 
+/* ---------- Sätze: ganze Wörter schreiben, automatisch in Buchstaben teilen ---------- */
+const SENTENCES=[
+  'Victor jagt zwölf Boxkämpfer quer über den großen Sylter Deich.',
+  'Franz fährt im komplett verwahrlosten Taxi quer durch Bayern.',
+  'Heute ist das Wetter schön und wir gehen in den Garten.',
+  'Ich habe mich sehr über deinen Brief gefreut.',
+  'Morgen schreiben wir eine Arbeit in Mathe und Deutsch.',
+  'Die Kinder spielen nach der Schule noch lange draußen.',
+  'Kannst du mir bitte das Buch von gestern mitbringen?',
+  'Wenn es regnet, bleiben wir lieber zu Hause und lesen.',
+  'Jeder Tag bietet eine neue Chance, etwas zu lernen.',
+  'Unsere Lehrerin erklärt die Aufgabe noch einmal ganz genau.',
+  'Opa erzählt gern Geschichten aus seiner Jugend.',
+  'Zum Frühstück gibt es Brot, Käse und frisches Obst.',
+  'Quer über die Wiese läuft ein kleiner Hund mit großen Ohren.',
+  'Nach dem Essen machen wir einen Spaziergang am See.',
+  'Paul und Rita treffen sich am Samstag im Park.',
+  'Es ist nicht so wichtig, wie schnell man ist, sondern dass man weitermacht.'
+];
+const spad=$('spad'), sc=spad.getContext('2d'), ruler=$('ruler'), rc=ruler.getContext('2d');
+let sv={si:0,wi:0,strokes:[],cuts:null,dirty:false,edited:false}, sActive=null, sIdle=null, drag=null, sList=SENTENCES;
+const djb=s=>{let h=5381;for(const c of s)h=(h*33+c.codePointAt(0))>>>0;return h.toString(36)};
+const coreOf=t=>t.replace(/[^\p{L}]/gu,'');
+function sentences(){
+  if($('sSource').value==='text'){
+    const t=cleanText($('text').value).split(/(?<=[.!?])\s+|\n+/).map(s=>s.trim()).filter(s=>s.split(/\s+/).some(w=>coreOf(w)));
+    if(t.length)return t;
+  }
+  return SENTENCES;
+}
+const tokensOf=s=>s.split(/\s+/).filter(Boolean);
+const wordsOf=s=>tokensOf(s).map((t,i)=>({t,i,core:coreOf(t)})).filter(x=>x.core);
+const entryId=(si,wi)=>djb(sList[si])+'-'+wi;
+const curWord=()=>wordsOf(sList[sv.si])[sv.wi];
+
+function refW(ch){
+  const own=font[ch];if(own&&own.length)return own.reduce((a,g)=>a+g.w,0)/own.length;
+  const s=SAMPLE[ch]||SAMPLE[UML[ch]];if(s)return s.w;
+  return ch==='ß'?800:650;
+}
+/* Erste Schätzung nach den Breiten der Buchstaben, dann jeder Schnitt an die Stelle, an der
+   möglichst wenig Tinte die Senkrechte kreuzt, am liebsten am Verbindungsstrich knapp über der Grundlinie. */
+function autoCuts(cs,strokes){
+  let x0=1e9,x1=-1e9;
+  for(const st of strokes)for(const p of st){x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0])}
+  if(!strokes.length)return null;
+  const n=cs.length;if(n===1)return[x0,x1];
+  const ws=cs.map(refW), segs=[];
+  for(const st of strokes)for(let i=0;i<st.length-1;i++)segs.push([st[i],st[i+1]]);
+  const cross=x=>{let c=0;for(const[p,q]of segs)if((p[0]-x)*(q[0]-x)<0){const y=p[1]+(q[1]-p[1])*(x-p[0])/(q[0]-p[0]);c+=1+Math.abs(y+130)/350}return c};
+  const cuts=[x0];
+  for(let k=1;k<n;k++){
+    const rest=ws.slice(k-1).reduce((a,b)=>a+b,0), prev=cuts[k-1], span=x1-prev;
+    const e=prev+span*ws[k-1]/rest, win=span*Math.min(ws[k-1],ws[k])/rest*.5;
+    const lo=Math.max(e-win,prev+span*ws[k-1]/rest*.35), hi=Math.min(e+win,x1-span/rest*ws.slice(k).reduce((a,b)=>a+b,0)*.35);
+    let best=clamp(e,prev+1,x1-1),bc=1e9;
+    for(let x=lo;x<=hi;x+=6){const d=(x-e)/(win||1),c=cross(x)+d*d*.8;if(c<bc){bc=c;best=x}}
+    cuts.push(Math.round(best));
+  }
+  cuts.push(x1);
+  return cuts;
+}
+function sLoad(){
+  const e=words.find(x=>x.id===entryId(sv.si,sv.wi));
+  sv.strokes=e?e.s.map(toPts):[];sv.cuts=e&&e.c?e.c.slice():null;sv.dirty=false;sv.edited=false;
+}
+function sCommit(){
+  if(!sv.dirty&&!sv.edited)return;
+  const w=curWord();if(!w){sv.dirty=sv.edited=false;return}
+  const id=entryId(sv.si,sv.wi), i=words.findIndex(x=>x.id===id);
+  if(sv.strokes.length&&sv.cuts){
+    const e={id,w:w.core,s:sv.strokes.map(st=>simplify(st,3).flatMap(p=>[Math.round(p[0]),Math.round(p[1]),Math.round(p[2])])),c:sv.cuts.map(Math.round)};
+    if(i>=0)words[i]=e;else words.push(e);
+  }else if(i>=0)words.splice(i,1);
+  sv.dirty=sv.edited=false;
+  persistWord(id);rebuildDerived();scheduleLayout();
+}
+function sJump(si,wi){
+  clearTimeout(sIdle);sCommit();
+  sv.si=clamp(si,0,sList.length-1);sv.wi=clamp(wi,0,Math.max(0,wordsOf(sList[sv.si]).length-1));
+  sLoad();sUpdate();sDraw();
+}
+function sGo(d){
+  let si=sv.si,wi=sv.wi+d;
+  if(wi>=wordsOf(sList[si]).length){si=(si+1)%sList.length;wi=0}
+  else if(wi<0){if(si===0)return;si--;wi=wordsOf(sList[si]).length-1}
+  sJump(si,wi);
+}
+function firstOpen(){
+  for(let si=0;si<sList.length;si++){const n=wordsOf(sList[si]).length;for(let wi=0;wi<n;wi++)if(!words.some(e=>e.id===entryId(si,wi)))return[si,wi]}
+  return[0,0];
+}
+function sEnter(){
+  const was=sList[sv.si];sList=sentences();
+  if(sList[sv.si]!==was||!curWord()){const[a,b]=firstOpen();sv.si=a;sv.wi=b}
+  sLoad();sUpdate();requestAnimationFrame(sizeSpad);
+}
+function sUpdate(){
+  const s=sList[sv.si]||'', host=$('sentence'), ws=wordsOf(s), cw=ws[sv.wi];
+  host.innerHTML='';
+  tokensOf(s).forEach((t,ti)=>{
+    const w=ws.find(x=>x.i===ti);
+    if(!w){const sp=document.createElement('span');sp.textContent=t;host.append(sp);return}
+    const wi=ws.indexOf(w), b=document.createElement('button');b.textContent=t;
+    if(words.some(e=>e.id===entryId(sv.si,wi)))b.className='done';
+    b.setAttribute('aria-current',String(w===cw));
+    b.onclick=()=>sJump(sv.si,wi);host.append(b);
+  });
+  $('sProgress').textContent=`Satz ${sv.si+1} von ${sList.length} · Wort ${sv.wi+1} von ${ws.length}`;
+  const letters=words.reduce((a,e)=>a+[...e.w].length,0);
+  $('sStats').textContent=words.length?`${words.length} ${words.length===1?'Wort':'Wörter'} geschrieben · ${letters} Buchstaben gesammelt`:'Noch keine Wörter geschrieben.';
+  $('sPrev').disabled=sv.si===0&&sv.wi===0;
+}
+function sizeSpad(){
+  const r=spad.getBoundingClientRect();if(!r.width)return;
+  const d=Math.min(window.devicePixelRatio||1,3);
+  spad.width=Math.round(r.width*d);spad.height=Math.round(r.height*d);
+  const rr=ruler.getBoundingClientRect();ruler.width=Math.round(rr.width*d);ruler.height=Math.round(rr.height*d);
+  sDraw();
+}
+function sDraw(){
+  if(!spad.height)return;
+  const k=spad.height/VH, W=spad.width, SW=W/k;
+  sc.setTransform(1,0,0,1,0,0);sc.clearRect(0,0,W,spad.height);
+  sc.setTransform(k,0,0,k,0,U.top*k);
+  const rule=(y,c,w,dash)=>{sc.strokeStyle=c;sc.lineWidth=w/k;sc.setLineDash(dash?[14,14]:[]);sc.beginPath();sc.moveTo(0,y);sc.lineTo(SW,y);sc.stroke()};
+  rule(-U.cap,tok('--guide'),1,true);rule(-U.xh,tok('--guide'),1.4,false);rule(0,tok('--guide-strong'),2,false);rule(420,tok('--guide'),1,true);
+  const cuts=sv.cuts;
+  if(cuts){
+    sc.setLineDash([10/k*3,8/k*3]);
+    cuts.forEach((x,i)=>{const inner=i>0&&i<cuts.length-1;sc.strokeStyle=tok(inner?'--guide-strong':'--guide');sc.lineWidth=(inner?1.5:1)/k;sc.beginPath();sc.moveTo(x,-U.top);sc.lineTo(x,U.bottom);sc.stroke()});
+  }
+  sc.setLineDash([]);sc.lineCap='round';sc.lineJoin='round';sc.strokeStyle=tok('--fg');
+  const sk=canvasSink(sc);
+  for(const s of sv.strokes)emit(s.flat(),9,sk);
+  // Leiste mit Buchstaben und Griffen
+  const H=ruler.height, d=W/spad.getBoundingClientRect().width||1;
+  rc.setTransform(1,0,0,1,0,0);rc.clearRect(0,0,ruler.width,H);
+  const w=curWord();
+  if(!cuts||!w){rc.fillStyle=tok('--muted');rc.font=`${14*d}px ${tok('--body')}`;rc.textBaseline='middle';rc.fillText(w?'Hier erscheinen die Buchstaben.':'',12*d,H/2);return}
+  const cs=[...w.core];
+  rc.textAlign='center';rc.textBaseline='middle';rc.font=`700 ${18*d}px ${tok('--body')}`;
+  cs.forEach((ch,i)=>{rc.fillStyle=tok('--fg');rc.fillText(ch,(cuts[i]+cuts[i+1])/2*k,H/2)});
+  for(let i=1;i<cuts.length-1;i++){
+    const x=cuts[i]*k;rc.fillStyle=tok('--guide-strong');
+    rc.beginPath();rc.roundRect?rc.roundRect(x-5*d,H*.18,10*d,H*.64,5*d):rc.rect(x-5*d,H*.18,10*d,H*.64);rc.fill();
+  }
+}
+function spoint(e){
+  const r=spad.getBoundingClientRect(), k=VH/r.height;
+  const p=e.pointerType==='pen'?clamp(e.pressure||.4,.05,1):.5;
+  return[(e.clientX-r.left)*k,(e.clientY-r.top)*k-U.top,Math.round(p*100)];
+}
+spad.addEventListener('pointerdown',e=>{
+  if(e.pointerType==='pen')penSeen=true;
+  if(e.pointerType==='touch'&&penSeen)return;
+  if(e.button>0||!curWord())return;
+  e.preventDefault();clearTimeout(sIdle);
+  try{spad.setPointerCapture(e.pointerId)}catch{}
+  sActive={id:e.pointerId,s:[spoint(e)]};sv.strokes.push(sActive.s);sv.dirty=true;sDraw();
+});
+spad.addEventListener('pointermove',e=>{
+  if(!sActive||e.pointerId!==sActive.id)return;
+  e.preventDefault();
+  const ev=e.getCoalescedEvents?e.getCoalescedEvents():[];
+  (ev.length?ev:[e]).forEach(x=>sActive.s.push(spoint(x)));
+  sDraw();
+});
+function sEnd(e){
+  if(!sActive||e.pointerId!==sActive.id)return;
+  sActive=null;sv.cuts=autoCuts([...curWord().core],sv.strokes);sv.edited=false;sDraw();
+  if($('sAuto').checked){clearTimeout(sIdle);sIdle=setTimeout(()=>sGo(1),1800)}
+}
+spad.addEventListener('pointerup',sEnd);
+spad.addEventListener('pointercancel',sEnd);
+const rx=e=>{const r=spad.getBoundingClientRect();return(e.clientX-r.left)*VH/r.height};
+ruler.addEventListener('pointerdown',e=>{
+  const c=sv.cuts;if(!c||c.length<3)return;
+  e.preventDefault();
+  const x=rx(e), tol=40*VH/spad.getBoundingClientRect().height;
+  let best=-1,bd=tol;
+  for(let i=1;i<c.length-1;i++){const dd=Math.abs(c[i]-x);if(dd<bd){bd=dd;best=i}}
+  if(best<0)return;
+  clearTimeout(sIdle);drag={id:e.pointerId,i:best};
+  try{ruler.setPointerCapture(e.pointerId)}catch{}
+});
+ruler.addEventListener('pointermove',e=>{
+  if(!drag||e.pointerId!==drag.id)return;
+  e.preventDefault();
+  const c=sv.cuts;c[drag.i]=Math.round(clamp(rx(e),c[drag.i-1]+20,c[drag.i+1]-20));sv.edited=true;sDraw();
+});
+const dragEnd=e=>{if(drag&&e.pointerId===drag.id)drag=null};
+ruler.addEventListener('pointerup',dragEnd);
+ruler.addEventListener('pointercancel',dragEnd);
+['touchstart','touchmove'].forEach(t=>{spad.addEventListener(t,e=>e.preventDefault(),{passive:false});ruler.addEventListener(t,e=>e.preventDefault(),{passive:false})});
+
 /* ---------- Vorschau ---------- */
 let laid=null, layoutTimer=null, playing=0;
 function scheduleLayout(){clearTimeout(layoutTimer);layoutTimer=setTimeout(render,140)}
@@ -793,7 +1103,7 @@ function render(){
   playing++;$('writing').hidden=true;
   const host=$('pages');
   if(!host.offsetParent&&host.clientWidth===0)return;
-  laid=layout($('text').value,activeFont(),opt);
+  laid=layout($('text').value,activeFont(),opt,hasOwn()?findRun:null);
   while(host.children.length>laid.pages.length)host.lastChild.remove();
   laid.pages.forEach((p,i)=>{const x=pageCanvas(i);drawPaper(x,opt);const sk=canvasSink(x);p.forEach(s=>emit(s,opt.pen,sk))});
   $('pagecount').textContent=laid.pages.length===1?'1 Seite':laid.pages.length+' Seiten';
@@ -865,11 +1175,12 @@ async function exportFile(button,make,name){
 
 /* ---------- Bedienung ---------- */
 function show(which){
-  const alpha=which==='alpha';
+  const alpha=which==='alpha', sent=which==='sent', write=!alpha&&!sent;
   if(!alpha)commit();
-  $('view-alpha').hidden=!alpha;$('view-write').hidden=alpha;
-  $('tab-alpha').setAttribute('aria-selected',String(alpha));$('tab-write').setAttribute('aria-selected',String(!alpha));
-  if(alpha)requestAnimationFrame(sizePad);else render();
+  if(!sent){clearTimeout(sIdle);sCommit()}
+  $('view-alpha').hidden=!alpha;$('view-sent').hidden=!sent;$('view-write').hidden=!write;
+  $('tab-alpha').setAttribute('aria-selected',String(alpha));$('tab-sent').setAttribute('aria-selected',String(sent));$('tab-write').setAttribute('aria-selected',String(write));
+  if(alpha)requestAnimationFrame(sizePad);else if(sent)sEnter();else render();
 }
 function saveOpt(){store.set('fs.opt',opt);scheduleLayout()}
 function syncInputs(){
@@ -878,9 +1189,18 @@ function syncInputs(){
   $('hyph').checked=opt.hyph;
   INKS.forEach((_,i)=>$('ink'+i).setAttribute('aria-pressed',String(i===opt.ink)));
 }
-function refreshAll(){ORDER.forEach(renderTile);loadCurrent();updateStage();if(!$('view-alpha').hidden)drawPad();render()}
+function refreshAll(){
+  ORDER.forEach(renderTile);loadCurrent();updateStage();if(!$('view-alpha').hidden)drawPad();
+  if(!sv.dirty&&!sv.edited)sLoad();sUpdate();if(!$('view-sent').hidden)sDraw();
+  render();
+}
 function wire(){
-  $('tab-alpha').onclick=()=>show('alpha');$('tab-write').onclick=()=>show('write');$('goAlpha').onclick=()=>show('alpha');
+  $('tab-alpha').onclick=()=>show('alpha');$('tab-sent').onclick=()=>show('sent');
+  $('sNext').onclick=()=>sGo(1);$('sPrev').onclick=()=>sGo(-1);
+  $('sSkip').onclick=()=>sJump((sv.si+1)%sList.length,0);
+  $('sUndo').onclick=()=>{clearTimeout(sIdle);if(sv.strokes.length){sv.strokes.pop();sv.cuts=sv.strokes.length?autoCuts([...curWord().core],sv.strokes):null;sv.dirty=true;sDraw()}};
+  $('sClear').onclick=()=>{clearTimeout(sIdle);sv.strokes=[];sv.cuts=null;sv.dirty=true;sCommit();sUpdate();sDraw()};
+  $('sSource').onchange=()=>{clearTimeout(sIdle);sCommit();store.set('fs.ssrc',$('sSource').value);sList=sentences();const[a,b]=firstOpen();sv.si=a;sv.wi=b;sLoad();sUpdate();sDraw()};$('tab-write').onclick=()=>show('write');$('goAlpha').onclick=()=>show('alpha');
   ['paper','margin'].forEach(k=>$(k).onchange=()=>{opt[k]=$(k).value;syncInputs();saveOpt()});
   ['xh','line','pen','track','nat'].forEach(k=>$(k).oninput=()=>{opt[k]=Number($(k).value);syncInputs();saveOpt()});
   $('hyph').onchange=()=>{opt.hyph=$('hyph').checked;saveOpt()};
@@ -906,11 +1226,13 @@ function wire(){
   $('undo').onclick=()=>{clearTimeout(idle);if(cur.strokes.length){cur.strokes.pop();cur.dirty=true;drawPad()}};
   $('clear').onclick=()=>{clearTimeout(idle);cur.strokes=[];cur.dirty=true;commit();loadCurrent();drawPad()};
   for(let i=0;i<MAXV;i++)$('v'+i).onclick=()=>jump(cur.i,i);
-  $('exportFont').onclick=async()=>{commit();try{await saveFile('federschrift-handschrift.json',new Blob([JSON.stringify({federschrift:1,font})],{type:'application/json'}));setSync('Sicherung gespeichert')}catch(e){setSync('Sicherung abgebrochen')}};
+  $('exportFont').onclick=async()=>{commit();try{await saveFile('federschrift-handschrift.json',new Blob([JSON.stringify({federschrift:1,font,words})],{type:'application/json'}));setSync('Sicherung gespeichert')}catch(e){setSync('Sicherung abgebrochen')}};
   $('importBtn').onclick=()=>$('importFile').click();
   $('importFile').onchange=async e=>{
     const f=e.target.files[0];if(!f)return;
-    try{const d=JSON.parse(await f.text());if(!d.font)throw 0;font=d.font;saveLocal();Object.keys(font).forEach(pushGlyph);refreshAll();setSync('Schrift geladen')}catch{setSync('Diese Datei ist keine Federschrift-Sicherung')}
+    try{const d=JSON.parse(await f.text());if(!d.font)throw 0;font=d.font;saveLocal();Object.keys(font).forEach(pushGlyph);
+      if(Array.isArray(d.words)){const old=words.map(e=>e.id);words=d.words;saveWordsLocal();old.filter(id=>!words.some(e=>e.id===id)).forEach(pushWord);words.forEach(e=>pushWord(e.id))}
+      rebuildDerived();refreshAll();setSync('Schrift geladen')}catch{setSync('Diese Datei ist keine Federschrift-Sicherung')}
     e.target.value='';
   };
   let armed=null;
@@ -918,9 +1240,11 @@ function wire(){
     const b=$('wipe');
     if(!armed){b.textContent='Wirklich alles löschen?';b.classList.add('warn');armed=setTimeout(()=>{armed=null;b.textContent='Alles löschen';b.classList.remove('warn')},4000);return}
     clearTimeout(armed);armed=null;b.textContent='Alles löschen';b.classList.remove('warn');
-    const keys=Object.keys(font);font={};cur.strokes=[];cur.dirty=false;store.del('fs.font');keys.forEach(pushGlyph);refreshAll();
+    const keys=Object.keys(font);font={};cur.strokes=[];cur.dirty=false;store.del('fs.font');keys.forEach(pushGlyph);
+    const ids=words.map(e=>e.id);words=[];store.del('fs.words');ids.forEach(pushWord);rebuildDerived();sv.strokes=[];sv.cuts=null;sv.dirty=false;
+    refreshAll();
   };
-  let w=0;new ResizeObserver(()=>{const n=document.documentElement.clientWidth;if(n!==w){w=n;if(!$('view-alpha').hidden)sizePad();else scheduleLayout()}}).observe(document.documentElement);
+  let w=0;new ResizeObserver(()=>{const n=document.documentElement.clientWidth;if(n!==w){w=n;if(!$('view-alpha').hidden)sizePad();else if(!$('view-sent').hidden)sizeSpad();else scheduleLayout()}}).observe(document.documentElement);
 }
 
 function installHint(){
@@ -936,10 +1260,12 @@ function installHint(){
 
 buildTiles();wire();syncInputs();installHint();
 $('text').value=store.get('fs.text')??SAMPLETEXT;
+if(store.get('fs.ssrc')==='text')$('sSource').value='text';
+sList=sentences();{const[a,b]=firstOpen();sv.si=a;sv.wi=b}sLoad();sUpdate();
 loadCurrent();ORDER.forEach(renderTile);updateStage();render();
 const start=async()=>{await connect();if(!col)render()};
 start();
-window.Federschrift={layout,buildPdf,buildGoodnotes,cleanText,hyphenPoints,opt:()=>opt,sampleFont};
+window.Federschrift={autoCuts,glyphOf,findRun,rebuildDerived,words:()=>words,layout,buildPdf,buildGoodnotes,cleanText,hyphenPoints,opt:()=>opt,sampleFont};
 })();
 </script>
 

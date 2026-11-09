@@ -7,8 +7,9 @@ Getippten Text in der eigenen Handschrift schreiben. Kostenlos, ohne Anmeldung u
 ## So funktioniert es
 
 1. **Alphabet schreiben:** Unter „Mein Alphabet“ schreibst du jedes Zeichen einmal mit dem Stift (Apple Pencil oder Finger). Zweite und dritte Versionen häufiger Buchstaben lassen die Schrift echter aussehen.
-2. **Text einfügen:** Unter „Schreiben“ den Text eintippen oder einfügen. Papier, Schriftgröße, Tintenfarbe und Natürlichkeit lassen sich einstellen.
-3. **Exportieren:**
+2. **Sätze schreiben (empfohlen):** Unter „Sätze“ schreibst du ganze Wörter aus Übungssätzen oder aus deinem eigenen Text. Die App teilt jedes Wort automatisch in Buchstaben auf. Liegt ein Trennstrich falsch, kannst du ihn in der Leiste unter dem Feld verschieben. Diese Buchstaben werden beim Schreiben mitbenutzt. Kommen mehrere Buchstaben hintereinander genau so in einem deiner Wörter vor, übernimmt die App das ganze Stück mit den echten Verbindungen. Dadurch wirkt die Schrift viel natürlicher.
+3. **Text einfügen:** Unter „Schreiben“ den Text eintippen oder einfügen. Papier, Schriftgröße, Tintenfarbe und Natürlichkeit lassen sich einstellen.
+4. **Exportieren:**
    - **Für GoodNotes:** erzeugt eine `.goodnotes`-Datei mit echten Stiftstrichen. In GoodNotes kannst du die Schrift radieren, mit dem Lasso verschieben und umfärben.
    - **PDF:** für jede andere App.
 
